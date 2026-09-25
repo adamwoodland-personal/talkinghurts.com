@@ -6,7 +6,7 @@
 //  - Cross-origin (the Hugging Face voice downloads) is deliberately not intercepted:
 //    vits-web keeps downloaded voices in its own browser storage.
 //  - Bump CACHE on every deploy that changes a precached file.
-const CACHE = 'th-v2';
+const CACHE = 'th-v3';
 const CORE = [
 	'/',
 	'/index.html',

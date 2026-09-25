@@ -20,3 +20,12 @@ A free, fully client-side communication aid for people who temporarily cannot sp
 
 Not a regulated medical device and not a substitute for professional speech therapy or
 AAC assessment.
+
+## Links
+
+- [Talking Hurts](https://talkinghurts.com/): the app
+
+## Related
+
+- [Adam's Arcade](https://games.adamwoodland.com/): all of the author's free browser games and tools
+- [Adam Woodland](https://adamwoodland.com/): the author, an OT/ICS cybersecurity consultant; this site is a side project
