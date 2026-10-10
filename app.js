@@ -816,6 +816,12 @@ $("setEmergency").addEventListener("change", () => {
   renderSuggestions();
 });
 
+// An iPhone Home Screen app follows Location Services > System Services > In-App Web Browsing
+// (not Safari Websites), and only reads it when the app starts (found on whatsacross.com
+// 2026-10-10). A toast is too brief for that, so it goes under the Save button.
+const IOS_APP = (/iPhone|iPad|iPod/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1))
+  && (navigator.standalone === true || matchMedia("(display-mode: standalone)").matches);
+
 $("addPlaceBtn").onclick = () => {
   if (!navigator.geolocation) { toast("This device can't give a location.", true); return; }
   const name = $("placeName").value.trim();
@@ -838,12 +844,18 @@ $("addPlaceBtn").onclick = () => {
       renderSettings();
       b.disabled = false;
       b.textContent = "📍 Save this location";
+      $("placeHelp").hidden = true;
       toast(`Saved "${name}"`);
     },
-    () => {
+    (err) => {
       b.disabled = false;
       b.textContent = "📍 Save this location";
       toast("Couldn't get a location - check permission.", true);
+      if (IOS_APP && err && (err.code === 1 || err.code === 2)) {
+        const device = /iPad|Macintosh/.test(navigator.userAgent) ? "iPad" : "iPhone";
+        $("placeHelp").textContent = `Location is blocked. On ${device}, an app added to the Home Screen needs Settings › Privacy & Security › Location Services › System Services › In-App Web Browsing switched on - then close Talking Hurts fully (swipe it away in the app switcher) and open it again.`;
+        $("placeHelp").hidden = false;
+      }
     },
     { enableHighAccuracy: true, timeout: 12000, maximumAge: 30000 },
   );

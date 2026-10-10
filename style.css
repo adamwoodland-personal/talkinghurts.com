@@ -386,6 +386,8 @@
     cursor: pointer;
   }
   .placeAdd select { width: auto; }
+  /* Why saving a place failed on an iPhone Home Screen app: stays put, unlike the toast. */
+  .placeHelp { margin: 8px 0 0; padding: 8px 10px; font-size: 13px; line-height: 1.45; background: var(--panel-2); border-left: 3px solid #d9482f; border-radius: 8px; }
   .setRow { display: flex; gap: 8px; }
   .setRow button {
     flex: 1;
