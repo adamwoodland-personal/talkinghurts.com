@@ -8,14 +8,21 @@ A free, fully client-side communication aid for people who temporarily cannot sp
 - Context tabs (Help, Out, Home, Shop, Cafe, Medical) with seed phrases per situation;
   the red Help tab is always first.
 - Learns locally: every spoken sentence becomes a one-tap suggestion, weighted by use,
-  per context. The model lives in the browser's local storage - nothing is uploaded,
+  per context. The model and settings stay in the browser's local storage on the device -
   no accounts, no tracking.
 - Optional natural neural voices (Piper, ~60 MB one-time download) with sentence-level
-  prosody; falls back to the device's built-in speech otherwise. Synthesised audio is
-  cached on-device for instant replay.
+  prosody; falls back to the device's built-in speech otherwise, using only voices that run
+  on the device (a browser's online voices only if switched on in Settings, and those may
+  send the spoken sentence to the voice's provider). With no such
+  voice the sentence is still shown in big text, with a note saying why it wasn't spoken.
+  Synthesised audio is cached on-device for instant replay.
 - Settings: your name and local emergency number personalise the phrases; saved places
   switch the context automatically on arrival (foreground only, no location uploads).
 - Backup export/import as a JSON file; imports merge so learning from two devices combines.
+  The file holds phrases, history, name and saved places, so it is private; a damaged file
+  is rejected whole.
+- If the browser won't save (private mode, full or blocked storage), Speak and Show still
+  work and what it learns is kept for the session.
 - Installable PWA, works fully offline. Portrait and landscape layouts.
 
 Not a regulated medical device and not a substitute for professional speech therapy or

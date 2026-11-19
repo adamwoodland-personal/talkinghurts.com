@@ -15,7 +15,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="apple-mobile-web-app-title" content="Talking Hurts">
 <meta property="og:title" content="Talking Hurts">
-<meta property="og:description" content="Lost your voice? Build sentences with taps and your phone speaks them. Free, offline-capable, private - it learns your phrases on your device and nothing is uploaded.">
+<meta property="og:description" content="Lost your voice? Build sentences with taps and your phone speaks them. Free, offline-capable, private - it learns your phrases on your device, and they stay there.">
 <meta property="og:url" content="https://talkinghurts.com/">
 <meta property="og:type" content="website">
 <meta property="og:image" content="https://talkinghurts.com/og-image.png">
@@ -35,7 +35,7 @@
   "applicationCategory": "MedicalApplication",
   "operatingSystem": "Any (browser)",
   "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
-  "description": "A free communication aid for people who temporarily cannot speak: build sentences from one-tap phrases and predictive words and the device speaks them aloud. Learns the user's phrases locally, works offline as an installable app, and uploads nothing."
+  "description": "A free communication aid for people who temporarily cannot speak: build sentences from one-tap phrases and predictive words and the device speaks them aloud. Learns the user's phrases on the device, where they and its settings stay, and works offline as an installable app. Only if the user switches on an online voice is the spoken sentence sent to that voice's provider."
 }
 </script>
 <script type="application/ld+json">
@@ -46,7 +46,7 @@
     {
       "@type": "Question",
       "name": "Does my data leave my device?",
-      "acceptedAnswer": { "@type": "Answer", "text": "No. The phrase model, your history, your name and your saved places live in your browser's local storage. The only network use is downloading the app itself and, if you choose one, a neural voice. Backups are files you export and keep yourself." }
+      "acceptedAnswer": { "@type": "Answer", "text": "Not unless you switch on online voices. Your learned phrases, history, name, settings and saved places stay on your device, in your browser's local storage, and the only other network use is downloading the app itself and, if you choose one, a neural voice. Online voices are off by default: if you allow them in Settings, each sentence you speak may be sent to that voice's provider (such as Google or Microsoft) to be spoken. Backups are files you export and keep yourself." }
     },
     {
       "@type": "Question",
@@ -56,7 +56,7 @@
     {
       "@type": "Question",
       "name": "What do the voices sound like?",
-      "acceptedAnswer": { "@type": "Answer", "text": "Out of the box it uses your device's built-in voice. You can optionally download a natural neural voice (Piper, about 60 MB, one-time) that speaks with proper sentence rhythm - much nicer for talking to people all day." }
+      "acceptedAnswer": { "@type": "Answer", "text": "Out of the box it uses a voice built into your device that works offline (online voices only if you allow them in Settings). If there is none, your sentence still shows in big text. You can optionally download a natural neural voice (Piper, about 60 MB, one-time) that speaks with proper sentence rhythm - much nicer for talking to people all day." }
     },
     {
       "@type": "Question",
@@ -148,9 +148,12 @@
 
     <h3 class="setSub">Voices on this device</h3>
     <div id="voiceStore"></div>
+    <label class="setCheck"><input type="checkbox" id="setOnlineVoices">
+      <span>Allow online voices <span class="setHint">Off: only voices that work offline are used, so nothing you say leaves the device. On: when no downloaded voice is ready, your browser's online voices can be used too (such as Chrome's "Google" voices or Edge's "Online" ones), and these may send each sentence you speak to the voice's provider to be spoken.</span></span>
+    </label>
 
     <h3 class="setSub">Move between devices</h3>
-    <p class="setHint">Everything this app learns stays on this device. Export a backup file here and import it on your other phone or computer - imports merge, so learning from both devices adds together.</p>
+    <p class="setHint">Everything this app learns stays on this device. Export a backup file here and import it on your other phone or computer - imports merge, so learning from both devices adds together. The file holds your learned phrases, recent history, name, emergency number and saved places with their locations, so keep it somewhere private.</p>
     <div class="setRow">
       <button id="exportBtn">⬆ Export backup</button>
       <button id="importBtn">⬇ Import backup</button>
@@ -165,21 +168,25 @@
       every sentence you speak becomes a one-tap suggestion the next time, organised by
       where you are. Install it to your home screen and it works entirely offline.</p>
       <h4>Does my data leave my device?</h4>
-      <p>No. The phrase model, your history, your name and your saved places live in your
-      browser's local storage. The only network use is downloading the app itself and, if
-      you choose one, a neural voice. Backups are files you export and keep yourself.</p>
+      <p>Not unless you switch on online voices. Your learned phrases, history, name, settings
+      and saved places stay on your device, in your browser's local storage, and the only
+      other network use is downloading the app itself and, if you choose one, a neural voice.
+      Online voices are off by default: if you allow them in Settings, each sentence you speak
+      may be sent to that voice's provider (such as Google or Microsoft) to be spoken. Backups
+      are files you export and keep yourself.</p>
       <h4>Does it work offline?</h4>
       <p>Yes - add it to your home screen and everything works with no connection, including
       a downloaded neural voice. Prediction runs entirely on the device.</p>
       <h4>What do the voices sound like?</h4>
-      <p>Out of the box it uses your device's built-in voice. You can optionally download a
-      natural neural voice (Piper, about 60 MB, one-time) that speaks with proper sentence
-      rhythm - much nicer for talking to people all day.</p>
+      <p>Out of the box it uses a voice built into your device that works offline (online
+      voices only if you allow them in Settings). If there is none, your sentence still shows
+      in big text. You can optionally download a natural neural voice (Piper, about 60 MB,
+      one-time) that speaks with proper sentence rhythm - much nicer for talking to people all day.</p>
       <h4>Is it a medical device?</h4>
       <p>No. It is a simple free tool, not a regulated medical device or a substitute for
       professional speech therapy or AAC assessment. For long-term speech loss, please talk
       to a speech-language professional about full AAC solutions.</p>
-      <p class="aboutFine">Free and open. Nothing tracked, nothing uploaded.
+      <p class="aboutFine">Free and open. Nothing tracked, and nothing you say leaves the device unless you allow online voices.
       Neural voices are <a href="https://github.com/rhasspy/piper" rel="noopener noreferrer">Piper</a> models:
       Male Northern English (OpenSLR 83, CC-BY-SA 4.0), Alan (Mycroft mimic3 apope), Jenny (Dioco),
       Alba (Edinburgh DataShare, CC-BY 4.0), and Amy and Ryan (US). Speech synthesis runs on
@@ -189,6 +196,7 @@
 </div>
 
 <div id="overlay">
+  <div id="overlayNote" role="status" hidden></div>
   <div id="overlayText"></div>
   <button id="againBtn">🔊 Say again</button>
   <div id="overlayHint">tap anywhere to close</div>

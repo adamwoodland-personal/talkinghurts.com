@@ -89,22 +89,65 @@ const voiceLabel = (id) => (VOICES.find((v) => v.id === id) || { label: id }).la
 
 /* ============================== state ============================== */
 
-const LS_MODEL = "th-model-v1";
+// Everything kept between visits (phrase model, history, settings, places, custom tabs) is
+// ONE localStorage record: a single setItem lands whole or not at all, so no save - an
+// import included - can leave some parts new and others old. Before 2026-11-19 each part
+// had its own key; those still load, and the first save that works removes them.
+const LS_STATE = "th-state-v2";
+const LS_V1 = { model: "th-model-v1", hist: "th-hist-v1", settings: "th-settings-v1", places: "th-places-v1", customCtx: "th-cctx-v1" };
 const LS_CTX = "th-ctx-v1";
 const LS_VOICE = "th-voice-v1";
-const LS_HIST = "th-hist-v1";
-const LS_SET = "th-settings-v1";
-const LS_PLACES = "th-places-v1";
-const LS_CCTX = "th-cctx-v1";
 
-let model = loadJSON(LS_MODEL) || { contexts: {} };
-let hist = loadJSON(LS_HIST) || []; // [{text, t}] newest first
-let settings = { name: "", emergency: "", ...(loadJSON(LS_SET) || {}) };
-let places = loadJSON(LS_PLACES) || []; // [{id, name, ctx, lat, lon, radius}]
-let customCtx = loadJSON(LS_CCTX) || []; // [{id, name, emoji}]
-let ctx = localStorage.getItem(LS_CTX) || "general";
+// Storage can be full, switched off (private modes, blocked site data) or throw on any
+// access. None of that may stop Speak or Show: everything lives in memory first, a read
+// that fails starts empty, and a write that fails only means this session isn't kept -
+// which the person is told once (and again only after every failed save has since worked).
+function readRaw(key) {
+  try { return localStorage.getItem(key); } catch { return null; }
+}
+const unsaved = new Set(); // keys whose latest save failed
+function store(key, value, quiet = false) {
+  try {
+    localStorage.setItem(key, value);
+    unsaved.delete(key);
+    return true;
+  } catch (e) {
+    console.warn(`Couldn't save ${key}:`, e);
+    if (!quiet) {
+      if (!unsaved.size) toast("Couldn't save on this device - new phrases and changes will be lost when the app closes.", true);
+      unsaved.add(key);
+    }
+    return false;
+  }
+}
+const isObj = (x) => !!x && typeof x === "object" && !Array.isArray(x);
+const asList = (v) => (Array.isArray(v) ? v.filter(isObj) : []);
+// Own entries only: a context id or phrase such as "constructor" must not find Object's.
+const own = (o, k) => (isObj(o) && Object.hasOwn(o, k) ? o[k] : undefined);
+const BUILTIN_IDS = new Set(CONTEXTS.map((c) => c.id));
+
+const savedState = loadJSON(LS_STATE);
+const part = (name) => (isObj(savedState) ? savedState[name] : loadJSON(LS_V1[name]));
+let model = part("model");
+if (!isObj(model) || !isObj(model.contexts)) model = { contexts: {} };
+let hist = asList(part("hist")); // [{text, t}] newest first
+const savedSettings = part("settings");
+let settings = { name: "", emergency: "", onlineVoices: false, ...(isObj(savedSettings) ? savedSettings : {}) };
+let places = asList(part("places")); // [{id, name, ctx, lat, lon, radius}]
+let customCtx = asList(part("customCtx")).filter((c) => typeof c.id === "string" && c.id && !BUILTIN_IDS.has(c.id)); // [{id, name, emoji}]
+
+let legacyCleared = false;
+function saveState(quiet = false) {
+  if (!store(LS_STATE, JSON.stringify({ model, hist, settings, places, customCtx }), quiet)) return false;
+  if (!legacyCleared) {
+    legacyCleared = true; // the old per-part keys are now stale copies (forgotten phrases too)
+    for (const k of Object.values(LS_V1)) { try { localStorage.removeItem(k); } catch {} }
+  }
+  return true;
+}
+let ctx = readRaw(LS_CTX) || "general";
 if (![...CONTEXTS, ...customCtx.map((c) => ({ id: c.id }))].some((c) => c.id === ctx)) ctx = "general";
-let voiceId = localStorage.getItem(LS_VOICE) || VOICES[0].id;
+let voiceId = readRaw(LS_VOICE) || VOICES[0].id;
 if (!VOICES.some((v) => v.id === voiceId)) voiceId = VOICES[0].id;
 let words = [];    // current sentence under construction
 let lastText = ""; // last spoken sentence, for "say again"
@@ -114,24 +157,25 @@ const $ = (id) => document.getElementById(id);
 /* ============================== model / prediction ============================== */
 
 function loadJSON(key) {
-  try { return JSON.parse(localStorage.getItem(key)); } catch { return null; }
+  try { return JSON.parse(readRaw(key)); } catch { return null; }
 }
-function saveModel() {
-  localStorage.setItem(LS_MODEL, JSON.stringify(model));
-}
+const saveModel = () => saveState();
+
+// A learned phrase's record, or undefined (own entries only, see own()).
+const learnedRec = (context, text) => own(own(model.contexts, context)?.sentences, text);
 
 // All candidate sentences for a context: seeds (weight 1) merged with
 // learned sentences (weight = times spoken), general seeds as fallback pool.
 function sentencesFor(context) {
   const out = new Map(); // text -> weight
-  for (const s of SEEDS[context] || []) out.set(s, 1);
+  for (const s of own(SEEDS, context) || []) out.set(s, 1);
   for (const s of personalSeeds(context)) out.set(s, 1.2); // personal lines float up a little
   // Blend in general phrases everywhere except Help, which stays urgent-only.
   if (context !== "general" && context !== "help")
     for (const s of SEEDS.general) out.set(s, out.get(s) || 0.5);
-  const learned = model.contexts[context]?.sentences || {};
-  for (const [text, rec] of Object.entries(learned)) {
-    out.set(text, (out.get(text) || 0) + rec.c);
+  const learned = own(model.contexts, context)?.sentences;
+  for (const [text, rec] of Object.entries(isObj(learned) ? learned : {})) {
+    if (Number.isFinite(rec?.c)) out.set(text, (out.get(text) || 0) + rec.c);
   }
   return out;
 }
@@ -183,8 +227,9 @@ function predict() {
 }
 
 function learn(text) {
-  const c = (model.contexts[ctx] ||= { sentences: {} });
-  const rec = (c.sentences[text] ||= { c: 0, t: 0 });
+  const c = own(model.contexts, ctx) || (model.contexts[ctx] = { sentences: {} });
+  if (!isObj(c.sentences)) c.sentences = {};
+  const rec = own(c.sentences, text) || (c.sentences[text] = { c: 0, t: 0 });
   rec.c += 1;
   rec.t = Date.now();
   saveModel();
@@ -192,7 +237,7 @@ function learn(text) {
 
 function pushHistory(text) {
   hist = [{ text, t: Date.now() }, ...hist.filter((h) => h.text !== text)].slice(0, 30);
-  localStorage.setItem(LS_HIST, JSON.stringify(hist));
+  saveState();
 }
 
 /* ============================== rendering ============================== */
@@ -206,7 +251,7 @@ function renderContexts() {
     b.onclick = () => {
       ctx = c.id;
       manualCtx = true; // a deliberate choice beats the geofence for this session
-      localStorage.setItem(LS_CTX, ctx);
+      store(LS_CTX, ctx);
       renderContexts();
       renderSuggestions();
     };
@@ -308,7 +353,7 @@ function attachLongPressForget(chip, text) {
     timer = setTimeout(() => {
       timer = 0;
       chip.dataset.held = "1";           // swallow the click that follows the release
-      const learned = !!model.contexts[ctx]?.sentences[text];
+      const learned = !!learnedRec(ctx, text);
       chip.innerHTML = "";
       chip.classList.add("confirming");
       const q = document.createElement("span");
@@ -370,6 +415,8 @@ if ("audioSession" in navigator) {
 // --- IndexedDB blob cache -------------------------------------------------
 function openDB() {
   return new Promise((res, rej) => {
+    // Some WebKit versions never answer indexedDB.open: speech must not wait on the cache.
+    setTimeout(() => rej(new Error("audio cache did not open")), 2000);
     const req = indexedDB.open("th-audio", 1);
     req.onupgradeneeded = () => req.result.createObjectStore("clips");
     req.onsuccess = () => res(req.result);
@@ -489,7 +536,7 @@ function renderVoices() {
   }
   sel.onchange = () => {
     voiceId = sel.value;
-    localStorage.setItem(LS_VOICE, voiceId);
+    store(LS_VOICE, voiceId);
     refreshVoiceStatus();
   };
 }
@@ -501,17 +548,58 @@ $("voicePlay").onclick = async () => {
 };
 
 // --- speak -----------------------------------------------------------------
-function webSpeech(text) {
-  const u = new SpeechSynthesisUtterance(text);
-  const v = speechSynthesis.getVoices().find((v) => v.lang.startsWith("en-GB"))
-         || speechSynthesis.getVoices().find((v) => v.lang.startsWith("en"));
-  if (v) u.voice = v;
-  speechSynthesis.cancel();
-  speechSynthesis.speak(u);
+// A browser's own voices can be online ones (Chrome's "Google" voices, Edge's "Online"
+// voices send the text to a server to be spoken). Nothing is meant to leave the device,
+// so only voices that report SpeechSynthesisVoice.localService are used unless online
+// voices are switched on in Settings. With no usable voice the sentence is still on the
+// big-text screen, and a note there says why it wasn't spoken.
+let voicesWaited = false;
+function deviceVoices() {
+  const synth = window.speechSynthesis;
+  if (!synth) return Promise.resolve([]);
+  const now = synth.getVoices();
+  if (now.length || voicesWaited) return Promise.resolve(now);
+  voicesWaited = true; // Chrome fills the list asynchronously: wait for it once
+  return new Promise((res) => {
+    const done = () => { clearTimeout(timer); synth.removeEventListener?.("voiceschanged", done); res(synth.getVoices()); };
+    const timer = setTimeout(done, 1500);
+    synth.addEventListener?.("voiceschanged", done);
+  });
 }
 
-// Audio pipeline only — no learning, no UI mutation. Reused by "say again".
+function notSpoken(reason) {
+  const synth = !!window.speechSynthesis, online = settings.onlineVoices === true;
+  const why = reason || (!synth ? "this browser has no built-in voice"
+    : online ? "the device voice isn't working" : "this device has no voice that works offline");
+  const fixes = [];
+  if (tts && !piperReady) fixes.push("download a voice at the top of the app");
+  if (synth && !online) fixes.push("allow online voices in Settings");
+  $("overlayNote").textContent = `Not spoken: ${why}.` + (fixes.length ? ` To hear it, ${fixes.join(" or ")}.` : "");
+  $("overlayNote").hidden = false;
+}
+
+async function webSpeech(text) {
+  try {
+    const online = settings.onlineVoices === true;
+    const all = await deviceVoices();
+    const pool = online ? all : all.filter((v) => v.localService);
+    const v = pool.find((v) => v.lang.startsWith("en-GB")) || pool.find((v) => v.lang.startsWith("en"))
+           || (online ? null : pool.find((v) => v.default) || pool[0]);
+    if (!v && !online) { notSpoken(); return; }
+    const u = new SpeechSynthesisUtterance(text);
+    if (v) u.voice = v; // online allowed and no English voice: the browser's default
+    u.onerror = (e) => { if (e.error !== "interrupted" && e.error !== "canceled") notSpoken("the device voice failed"); };
+    speechSynthesis.cancel();
+    speechSynthesis.speak(u);
+  } catch (e) {
+    console.warn("Device voice failed:", e);
+    notSpoken();
+  }
+}
+
+// Audio pipeline only — no learning; the one UI it touches is the not-spoken note. Reused by "say again".
 async function speakText(text) {
+  $("overlayNote").hidden = true;
   // Unlock the audio element inside the tap gesture (iOS requirement).
   player.src = SILENT_WAV;
   player.play().catch(() => {});
@@ -527,26 +615,28 @@ async function speakText(text) {
       player.src = URL.createObjectURL(blob);
       await player.play();
     } else {
-      webSpeech(text); // model not downloaded / unavailable
+      await webSpeech(text); // model not downloaded / unavailable
     }
   } catch (e) {
     console.warn("Neural speak failed, using device voice:", e);
-    webSpeech(text);
+    await webSpeech(text);
   }
 }
 
-// Take the composed sentence: learn it, show it, say it, and clear the bar
-// so the app is immediately ready for the next sentence.
+// Take the composed sentence: show it, learn it, and clear the bar so the app is
+// immediately ready for the next sentence (speak() then says it). Showing comes first and
+// nothing after it can stop it or the speech: learning and history are extras, and stay
+// in memory for the session if storage won't save them.
 function takeSentence() {
-  if ($("freeText").value.trim()) addTyped();
+  const typed = $("freeText").value.trim();
+  if (typed) { words.push(...typed.split(/\s+/)); $("freeText").value = ""; }
   const text = words.join(" ");
   if (!text) return null;
   lastText = text;
-  learn(text);
-  pushHistory(text);
   words = [];
-  refresh();
   showOverlay(text);
+  try { learn(text); pushHistory(text); } catch (e) { console.warn("Couldn't learn this sentence:", e); }
+  try { refresh(); } catch (e) { console.warn("Couldn't refresh suggestions:", e); }
   return text;
 }
 
@@ -568,6 +658,7 @@ $("againBtn").onclick = (e) => {
 
 function showOverlay(text) {
   $("overlayText").textContent = text;
+  $("overlayNote").hidden = true;
   $("overlay").classList.add("show");
 }
 $("overlay").onclick = () => $("overlay").classList.remove("show");
@@ -627,13 +718,14 @@ function toast(msg, isError = false) {
 
 /* ============================== settings sheet ============================== */
 
-function saveSettings() { localStorage.setItem(LS_SET, JSON.stringify(settings)); }
-function savePlaces() { localStorage.setItem(LS_PLACES, JSON.stringify(places)); }
+const saveSettings = () => saveState();
+const savePlaces = () => saveState();
 
 const EMERGENCY_NUMBERS = ["", "000", "999", "911", "112", "111"];
 
 function renderSettings() {
   $("setName").value = settings.name;
+  $("setOnlineVoices").checked = settings.onlineVoices === true;
   const sel = $("setEmergency");
   sel.innerHTML = "";
   for (const n of EMERGENCY_NUMBERS) {
@@ -667,7 +759,7 @@ function renderSettings() {
 
 /* ---- custom contexts ---- */
 
-function saveCustomCtx() { localStorage.setItem(LS_CCTX, JSON.stringify(customCtx)); }
+const saveCustomCtx = () => saveState();
 
 function renderCustomCtxList() {
   const list = $("ctxList");
@@ -679,21 +771,19 @@ function renderCustomCtxList() {
     const row = document.createElement("div");
     row.className = "placeRow";
     const label = document.createElement("span");
-    const n = Object.keys(model.contexts[c.id]?.sentences || {}).length;
+    const n = Object.keys(own(model.contexts, c.id)?.sentences || {}).length;
     label.textContent = `${c.emoji || "⭐"} ${c.name}${n ? ` (${n} learned phrase${n === 1 ? "" : "s"})` : ""}`;
     const del = document.createElement("button");
     del.textContent = "✕";
     del.title = "Remove this tab";
     del.onclick = () => {
-      const n2 = Object.keys(model.contexts[c.id]?.sentences || {}).length;
+      const n2 = Object.keys(own(model.contexts, c.id)?.sentences || {}).length;
       if (!confirm(`Remove the "${c.name}" tab${n2 ? ` and its ${n2} learned phrase${n2 === 1 ? "" : "s"}` : ""}?`)) return;
       customCtx = customCtx.filter((x) => x !== c);
-      saveCustomCtx();
       delete model.contexts[c.id];
-      saveModel();
       places = places.filter((p) => p.ctx !== c.id);   // geofences pointing at it go too
-      savePlaces();
-      if (ctx === c.id) { ctx = "general"; localStorage.setItem(LS_CTX, ctx); }
+      saveState();                                      // all three changes in one write
+      if (ctx === c.id) { ctx = "general"; store(LS_CTX, ctx); }
       renderContexts();
       renderSuggestions();
       renderSettings();
@@ -719,9 +809,8 @@ $("addCtxBtn").onclick = () => {
 /* ---- learned-phrase manager ---- */
 
 function forgetPhrase(context, text) {
-  const c = model.contexts[context];
-  if (!c || !c.sentences[text]) return false;
-  delete c.sentences[text];
+  if (!learnedRec(context, text)) return false;
+  delete model.contexts[context].sentences[text];
   saveModel();
   return true;
 }
@@ -739,7 +828,7 @@ function renderPhraseManager() {
   sel.value = allContexts().some((c) => c.id === prev) ? prev : ctx;
   const list = $("phraseList");
   list.innerHTML = "";
-  const learned = Object.entries(model.contexts[sel.value]?.sentences || {}).sort((a, b) => b[1].c - a[1].c);
+  const learned = Object.entries(own(model.contexts, sel.value)?.sentences || {}).sort((a, b) => b[1].c - a[1].c);
   if (learned.length === 0) {
     list.innerHTML = '<div class="empty">Nothing learned in this tab yet. Everything you speak lands here, most-used first.</div>';
     return;
@@ -769,7 +858,7 @@ async function renderVoiceStore() {
   const list = $("voiceStore");
   list.innerHTML = "";
   if (!tts) {
-    list.innerHTML = '<div class="empty">Neural voices are unavailable on this device - the built-in voice is used instead.</div>';
+    list.innerHTML = '<div class="empty">Neural voices are unavailable on this device - its built-in voice is used instead, if it has one that works offline (or online voices are allowed below).</div>';
     return;
   }
   let stored = [];
@@ -814,6 +903,10 @@ $("setEmergency").addEventListener("change", () => {
   settings.emergency = $("setEmergency").value;
   saveSettings();
   renderSuggestions();
+});
+$("setOnlineVoices").addEventListener("change", () => {
+  settings.onlineVoices = $("setOnlineVoices").checked;
+  saveSettings();
 });
 
 // An iPhone Home Screen app follows Location Services > System Services > In-App Web Browsing
@@ -905,57 +998,103 @@ $("exportBtn").onclick = async () => {
   setTimeout(() => URL.revokeObjectURL(url), 5000);
 };
 
+// Build the merged state from a backup without touching the live state: every section is
+// checked and merged into copies first, so a damaged file changes nothing at all.
+function mergeBackup(d) {
+  if (!isObj(d) || d.app !== "talkinghurts.com" || d.schema !== 1) throw new Error("not a Talking Hurts backup");
+  const section = (name, ok) => {
+    if (d[name] == null) return null;
+    if (!ok(d[name])) throw new Error(`the ${name} part of the file is damaged`);
+    return d[name];
+  };
+  const inModel = section("model", (m) => isObj(m) && (m.contexts == null || isObj(m.contexts)));
+  const inHist = section("hist", Array.isArray);
+  const inSettings = section("settings", isObj);
+  const inCtx = section("customCtx", Array.isArray);
+  const inPlaces = section("places", Array.isArray);
+  const str = (x) => typeof x === "string" && x.trim() !== "";
+  const next = {
+    model: JSON.parse(JSON.stringify(model)),
+    hist: [...hist], settings: { ...settings }, customCtx: [...customCtx], places: [...places],
+  };
+  // Tabs first, so every phrase and place below can be checked against the merged set.
+  // Tab ids are always "c-" + a UUID. A tab with the same name as one here is the same tab
+  // (each device made its own id), so its phrases and places join this device's tab.
+  const remap = new Map(), byName = new Map(next.customCtx.map((c) => [c.name, c.id]));
+  for (const c of inCtx || []) {
+    if (!isObj(c) || typeof c.id !== "string" || !/^c-[0-9a-f-]{8,64}$/i.test(c.id) || !str(c.name)) continue;
+    if (byName.has(c.name)) { if (byName.get(c.name) !== c.id) remap.set(c.id, byName.get(c.name)); continue; }
+    if (next.customCtx.some((x) => x.id === c.id)) continue;
+    next.customCtx.push({ id: c.id, name: c.name, emoji: typeof c.emoji === "string" ? c.emoji.slice(0, 4) : "" });
+    byName.set(c.name, c.id);
+  }
+  const known = new Set([...BUILTIN_IDS, ...next.customCtx.map((c) => c.id)]);
+  const tabOf = (id) => { const t = remap.get(id) || id; return known.has(t) ? t : null; };
+  let phrases = 0, dropped = 0;
+  // Merge, never overwrite: counts add up, so phone + PC learning combine.
+  for (const [cid, c] of Object.entries(inModel?.contexts || {})) {
+    if (!isObj(c) || !isObj(c.sentences)) continue;
+    const tab = tabOf(cid);
+    if (!tab) { dropped += Object.keys(c.sentences).length; continue; } // no such tab, here or in the file
+    const mine = own(next.model.contexts, tab) || (next.model.contexts[tab] = { sentences: {} });
+    if (!isObj(mine.sentences)) mine.sentences = {};
+    for (const [text, rec] of Object.entries(c.sentences)) {
+      if (text === "__proto__" || !text.trim() || !isObj(rec) || !Number.isFinite(rec.c) || rec.c <= 0) continue;
+      const r = own(mine.sentences, text) || (mine.sentences[text] = { c: 0, t: 0 });
+      r.c += rec.c;
+      r.t = Math.max(r.t, Number.isFinite(rec.t) ? rec.t : 0);
+      phrases++;
+    }
+  }
+  const seen = new Set(next.hist.map((h) => h.text));
+  for (const h of inHist || []) {
+    if (isObj(h) && str(h.text) && !seen.has(h.text)) { next.hist.push({ text: h.text, t: Number.isFinite(h.t) ? h.t : 0 }); seen.add(h.text); }
+  }
+  next.hist.sort((a, b) => b.t - a.t);
+  next.hist = next.hist.slice(0, 30);
+  // Fill gaps in the name and number only: an imported file never switches online voices on.
+  if (inSettings) {
+    if (!next.settings.name && str(inSettings.name)) next.settings.name = inSettings.name;
+    if (!next.settings.emergency && str(inSettings.emergency)) next.settings.emergency = inSettings.emergency;
+  }
+  const names = new Set(next.places.map((p) => p.name));
+  for (const p of inPlaces || []) {
+    const tab = isObj(p) ? tabOf(p.ctx) : null;
+    if (!tab) { if (isObj(p)) dropped++; continue; }
+    if (str(p.name) && !names.has(p.name) && Number.isFinite(p.lat) && Number.isFinite(p.lon)
+        && Math.abs(p.lat) <= 90 && Math.abs(p.lon) <= 180) {
+      next.places.push({ id: str(p.id) ? p.id : crypto.randomUUID(), name: p.name, ctx: tab,
+        lat: p.lat, lon: p.lon, radius: Number.isFinite(p.radius) && p.radius > 0 ? p.radius : 150 });
+      names.add(p.name);
+    }
+  }
+  return { next, phrases, dropped };
+}
+
 $("importBtn").onclick = () => $("importFile").click();
 $("importFile").addEventListener("change", async () => {
   const f = $("importFile").files[0];
   $("importFile").value = "";
   if (!f) return;
+  let merged;
   try {
-    const d = JSON.parse(await f.text());
-    if (d.app !== "talkinghurts.com" || d.schema !== 1) throw new Error("not a Talking Hurts backup");
-    let phrases = 0;
-    // Merge, never overwrite: counts add up, so phone + PC learning combine.
-    for (const [cid, c] of Object.entries(d.model?.contexts || {})) {
-      const mine = (model.contexts[cid] ||= { sentences: {} });
-      for (const [text, rec] of Object.entries(c.sentences || {})) {
-        const r = (mine.sentences[text] ||= { c: 0, t: 0 });
-        r.c += rec.c || 0;
-        r.t = Math.max(r.t, rec.t || 0);
-        phrases++;
-      }
-    }
-    saveModel();
-    const seen = new Set(hist.map((h) => h.text));
-    for (const h of d.hist || []) if (h && h.text && !seen.has(h.text)) hist.push({ text: h.text, t: h.t || 0 });
-    hist.sort((a, b) => b.t - a.t);
-    hist = hist.slice(0, 30);
-    localStorage.setItem(LS_HIST, JSON.stringify(hist));
-    if (d.settings) {
-      if (!settings.name && d.settings.name) settings.name = d.settings.name;
-      if (!settings.emergency && d.settings.emergency) settings.emergency = d.settings.emergency;
-      saveSettings();
-    }
-    const ctxIds = new Set(customCtx.map((c) => c.id)), ctxNames = new Set(customCtx.map((c) => c.name));
-    for (const c of d.customCtx || []) {
-      if (c && c.id && c.name && !ctxIds.has(c.id) && !ctxNames.has(c.name)) {
-        customCtx.push({ id: c.id, name: c.name, emoji: c.emoji || "" });
-      }
-    }
-    saveCustomCtx();
-    const names = new Set(places.map((p) => p.name));
-    for (const p of d.places || []) {
-      if (p && p.name && !names.has(p.name) && Number.isFinite(p.lat) && Number.isFinite(p.lon)) {
-        places.push({ id: p.id || crypto.randomUUID(), name: p.name, ctx: p.ctx, lat: p.lat, lon: p.lon, radius: p.radius || 150 });
-      }
-    }
-    savePlaces();
-    renderContexts();
-    renderSettings();
-    renderSuggestions();
-    toast(`Imported ${phrases} learned phrase${phrases === 1 ? "" : "s"}`);
+    merged = mergeBackup(JSON.parse(await f.text()));
   } catch (e) {
-    toast(`Import failed: ${e.message}`, true);
+    toast(`Import failed: ${e.message}. Nothing was changed.`, true);
+    return;
   }
+  // The whole merge is swapped in at once and saved as the one record, so it is on the
+  // device entirely or not at all. If this device won't save, it is still used for this
+  // session (like everything else when storage fails).
+  ({ model, hist, settings, customCtx, places } = merged.next);
+  const saved = saveState(true);
+  renderContexts();
+  renderSettings();
+  renderSuggestions();
+  const n = `${merged.phrases} learned phrase${merged.phrases === 1 ? "" : "s"}`
+    + (merged.dropped ? ` (${merged.dropped} for tabs that don't exist left out)` : "");
+  if (saved) toast(`Imported ${n}`);
+  else toast(`Imported ${n} for now, but this device couldn't save them - they will be lost when the app closes.`, true);
 });
 
 /* ============================== geofencing (foreground only) ============================== */
@@ -979,14 +1118,18 @@ function geoCheck() {
   lastGeoCheck = Date.now();
   navigator.geolocation.getCurrentPosition(
     (pos) => {
+      // Only places whose tab still exists take part: an orphaned place nearer by must
+      // not hide a usable one.
+      const tabs = new Set(allContexts().map((c) => c.id));
       let best = null, bestD = Infinity;
       for (const p of places) {
+        if (!tabs.has(p.ctx)) continue;
         const dd = distM(pos.coords.latitude, pos.coords.longitude, p.lat, p.lon);
         if (dd <= p.radius && dd < bestD) { best = p; bestD = dd; }
       }
-      if (best && best.ctx !== ctx && allContexts().some((c) => c.id === best.ctx)) {
+      if (best && best.ctx !== ctx) {
         ctx = best.ctx;
-        localStorage.setItem(LS_CTX, ctx);
+        store(LS_CTX, ctx, true); // background switch: no storage warning over its own toast
         renderContexts();
         renderSuggestions();
         toast(`📍 ${best.name}`);
@@ -1001,7 +1144,7 @@ document.addEventListener("visibilitychange", () => { if (!document.hidden) geoC
 /* ============================== boot ============================== */
 
 // iOS loads voices asynchronously; poke the list early so the fallback works.
-speechSynthesis?.getVoices();
+window.speechSynthesis?.getVoices(); // a bare speechSynthesis would throw where it is missing
 
 renderContexts();
 renderVoices();

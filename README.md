@@ -16,14 +16,20 @@ opposite you.
 - **It learns**: every sentence you speak becomes a one-tap suggestion next time, weighted
   by use, per context - a simple sentence-frequency model with a bigram fallback, entirely
   in local storage.
-- **Voices**: your device's built-in speech out of the box; optionally a natural
+- **Voices**: your device's built-in speech out of the box - only voices that run on the
+  device, unless online browser voices are switched on in Settings (those may send the
+  spoken sentence to the voice's provider; with no offline voice
+  the sentence is still shown in big text, with a note saying why); optionally a natural
   [Piper](https://github.com/rhasspy/piper) neural voice (~60 MB one-time download from
   Hugging Face), synthesised on-device with a self-hosted
   [vits-web](https://github.com/diffusionstudio/vits-web) + ONNX Runtime stack. Synthesised
   clips are cached; Help-tab phrases are pre-synthesised so emergencies never wait.
 - **Private by design**: no server, no accounts, no analytics beyond standard web logs.
   The model, history, settings and places never leave the device. Backups are files you
-  export yourself - imports merge, so learning from phone and PC combines.
+  export yourself - imports merge, so learning from phone and PC combines. A backup holds
+  your phrases, history, name and saved places, so keep it private; a damaged one is
+  rejected whole rather than half-imported. If the browser won't save at all (private
+  mode, full storage), Speak and Show still work and learning lasts for the session.
 - **Installable PWA**: works fully offline, portrait and landscape.
 
 ## Running locally
