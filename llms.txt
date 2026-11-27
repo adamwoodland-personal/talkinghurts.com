@@ -25,12 +25,18 @@ A free, fully client-side communication aid for people who temporarily cannot sp
   work and what it learns is kept for the session.
 - Installable PWA, works fully offline. Portrait and landscape layouts.
 
+- Whispering: the FAQ quotes the NHS ("do not talk loudly or whisper - both strain your voice"); the app
+  is the alternative.
+- Emergencies: the red Help tab has phrases such as "Call an ambulance please"; with an emergency number
+  set it also offers "Call [number] please". It speaks to people nearby; it cannot make calls.
+
 Not a regulated medical device and not a substitute for professional speech therapy or
 AAC assessment.
 
 ## Links
 
 - [Talking Hurts](https://talkinghurts.com/): the app
+- [Lost your voice? How to talk without talking](https://talkinghurts.com/lost-your-voice/): a guide for people who have just lost their voice: the NHS's laryngitis advice quoted and linked (speak as little as possible; don't talk loudly or whisper; usually better in 1 to 2 weeks; when to see a GP, contact 111 or call 999), simple ways to get by without talking, and how to set up the app
 
 ## Related
 

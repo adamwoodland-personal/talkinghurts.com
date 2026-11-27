@@ -4,8 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#10141c">
-<title>Talking Hurts - speak with taps when your voice can't</title>
-<meta name="description" content="A free communication aid for when talking hurts or your voice is gone: tap phrases and predicted words, and your phone speaks them aloud. Works offline.">
+<title>Talking Hurts: free text to speech for when you've lost your voice</title>
+<meta name="description" content="Lost your voice? Tap phrases and predicted words and your phone says them aloud, or shows them in big text. Free, private, and it works offline.">
 <link rel="canonical" href="https://talkinghurts.com/">
 <link rel="stylesheet" href="style.css">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
@@ -14,6 +14,8 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
 <meta name="apple-mobile-web-app-title" content="Talking Hurts">
+<meta property="og:site_name" content="Talking Hurts">
+<meta property="og:locale" content="en_GB">
 <meta property="og:title" content="Talking Hurts">
 <meta property="og:description" content="Lost your voice? Build sentences with taps and your phone speaks them. Free, offline-capable, private - it learns your phrases on your device, and they stay there.">
 <meta property="og:url" content="https://talkinghurts.com/">
@@ -32,9 +34,14 @@
   "@type": "WebApplication",
   "name": "Talking Hurts",
   "url": "https://talkinghurts.com/",
-  "applicationCategory": "MedicalApplication",
+  "applicationCategory": "CommunicationApplication",
   "operatingSystem": "Any (browser)",
   "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+  "isAccessibleForFree": true,
+  "inLanguage": "en",
+  "image": "https://talkinghurts.com/og-image.png",
+  "screenshot": "https://talkinghurts.com/img/talking-hurts-cafe-phrases.jpg",
+  "author": { "@type": "Person", "name": "Adam Woodland", "url": "https://adamwoodland.com/" },
   "description": "A free communication aid for people who temporarily cannot speak: build sentences from one-tap phrases and predictive words and the device speaks them aloud. Learns the user's phrases on the device, where they and its settings stay, and works offline as an installable app. Only if the user switches on an online voice is the spoken sentence sent to that voice's provider."
 }
 </script>
@@ -60,6 +67,16 @@
     },
     {
       "@type": "Question",
+      "name": "Should I whisper instead?",
+      "acceptedAnswer": { "@type": "Answer", "text": "No. The NHS's advice for laryngitis is to \"try to speak as little as possible\" and \"do not talk loudly or whisper – both strain your voice\". That's what Talking Hurts is for: tap, and your phone speaks for you." }
+    },
+    {
+      "@type": "Question",
+      "name": "Can it help in an emergency?",
+      "acceptedAnswer": { "@type": "Answer", "text": "The red Help tab is always first, with phrases such as \"I need help\", \"Call an ambulance please\" and \"This is an emergency\". Add your emergency number in Settings and it also offers \"Call [number] please\". It speaks to the people around you; it can't make a call itself." }
+    },
+    {
+      "@type": "Question",
       "name": "Is it a medical device?",
       "acceptedAnswer": { "@type": "Answer", "text": "No. It is a simple free tool, not a regulated medical device or a substitute for professional speech therapy or AAC assessment. For long-term speech loss, please talk to a speech-language professional about full AAC solutions." }
     }
@@ -69,9 +86,12 @@
 </head>
 <body>
 
+<noscript>
+<p class="noscript">Talking Hurts needs JavaScript to run. It's a free communication aid for when you've lost your voice or talking hurts: tap phrases and predicted words, and your phone says them aloud or shows them in big text. Everything stays on your device. <a href="/lost-your-voice/">Lost your voice? How to talk without talking</a></p>
+</noscript>
 <div id="appview">
 <header>
-  <h1>Talking&nbsp;Hurts</h1>
+  <h1>Talking&nbsp;Hurts <span class="h1-sub">speak with taps</span></h1>
   <div id="voiceBox">
     <div id="voiceStatus">loading…</div>
     <select id="voiceSel" aria-label="Voice"></select>
@@ -82,7 +102,7 @@
 
 <div id="contexts"></div>
 
-<div id="sentenceBar"></div>
+<div id="sentenceBar"><span class="placeholder">Tap words below to build a sentence…</span></div>
 
 <div id="suggestions">
   <div class="sugHead" id="completionsHead">Say it in one tap</div>
@@ -167,6 +187,7 @@
       radiotherapy, or just a day when every word costs too much. It learns as you use it:
       every sentence you speak becomes a one-tap suggestion the next time, organised by
       where you are. Install it to your home screen and it works entirely offline.</p>
+      <p>Just lost your voice? Read <a href="/lost-your-voice/">how to talk without talking</a>, with the NHS's advice.</p>
       <h4>Does my data leave my device?</h4>
       <p>Not unless you switch on online voices. Your learned phrases, history, name, settings
       and saved places stay on your device, in your browser's local storage, and the only
@@ -182,6 +203,14 @@
       voices only if you allow them in Settings). If there is none, your sentence still shows
       in big text. You can optionally download a natural neural voice (Piper, about 60 MB,
       one-time) that speaks with proper sentence rhythm - much nicer for talking to people all day.</p>
+      <h4>Should I whisper instead?</h4>
+      <p>No. The NHS's advice for laryngitis is to "try to speak as little as possible" and "do not talk
+      loudly or whisper – both strain your voice". That's what Talking Hurts is for: tap, and your phone
+      speaks for you.</p>
+      <h4>Can it help in an emergency?</h4>
+      <p>The red Help tab is always first, with phrases such as "I need help", "Call an ambulance please"
+      and "This is an emergency". Add your emergency number in Settings and it also offers "Call [number]
+      please". It speaks to the people around you; it can't make a call itself.</p>
       <h4>Is it a medical device?</h4>
       <p>No. It is a simple free tool, not a regulated medical device or a substitute for
       professional speech therapy or AAC assessment. For long-term speech loss, please talk

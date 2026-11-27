@@ -31,6 +31,7 @@ opposite you.
   rejected whole rather than half-imported. If the browser won't save at all (private
   mode, full storage), Speak and Show still work and learning lasts for the session.
 - **Installable PWA**: works fully offline, portrait and landscape.
+- **A guide**: `lost-your-voice/index.html` ("Lost your voice? How to talk without talking") quotes the NHS on laryngitis and explains how to get by without talking. It and `404.html` share `guide.css`; `img/` holds real screenshots of the app.
 
 ## Running locally
 

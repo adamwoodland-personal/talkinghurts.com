@@ -6,10 +6,13 @@
 //  - Cross-origin (the Hugging Face voice downloads) is deliberately not intercepted:
 //    vits-web keeps downloaded voices in its own browser storage.
 //  - Bump CACHE on every deploy that changes a precached file.
-const CACHE = 'th-v6';
+const CACHE = 'th-v7';
+// "/" and folder URLs only, never ".../index.html": since 2026-11-27 those 301 to their folder, and a cached
+// redirect cannot be served for a navigation (Chromium refuses it), which would break the offline fallback.
 const CORE = [
 	'/',
-	'/index.html',
+	'/lost-your-voice/',
+	'/guide.css',
 	'/style.css',
 	'/app.js',
 	'/favicon.svg',
@@ -60,7 +63,7 @@ self.addEventListener('fetch', (e) => {
 			.catch(async () => {
 				const hit = await caches.match(req);
 				if (hit) return hit;
-				if (req.mode === 'navigate') { const shell = await caches.match('/index.html'); if (shell) return shell; }
+				if (req.mode === 'navigate') { const shell = await caches.match('/'); if (shell) return shell; }
 				return Response.error();
 			})
 	);
